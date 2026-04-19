@@ -2,72 +2,105 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 const App = () => {
-  const [score, setScore] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [score, setScore] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
 
-  // --- AUTO UPDATE LOGIC ---
+  // 1. AUTO-UPDATE LOGIC (GitHub URL fixed for Raheeplays)
   useEffect(() => {
     const checkUpdate = async () => {
       try {
-        // Change 'YOUR_GITHUB_USERNAME' to your actual username
-        const res = await fetch('https://github.com');
+        const res = await fetch('https://github.com/RaheePlays');
         const data = await res.json();
-        const latestVer = data.tag_name;
-        const currentVer = localStorage.getItem('app_v') || 'v0';
-
-        if (latestVer !== currentVer) {
-          console.log("New update found: " + latestVer);
-          // Yahan FileSystem download logic trigger hogi
-          localStorage.setItem('app_v', latestVer);
+        if (data.tag_name && data.tag_name !== localStorage.getItem('app_v')) {
+          console.log("New Update Available: " + data.tag_name);
+          localStorage.setItem('app_v', data.tag_name);
         }
-      } catch (e) { console.log("Offline mode"); }
+      } catch (e) { console.log("Offline Mode Active"); }
     };
     checkUpdate();
   }, []);
 
-  // --- SNAKE GAME LOGIC ---
+  // 2. SNAKE GAME LOGIC
   useEffect(() => {
+    if (gameOver) return;
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext('2d')!;
-    let box = 20, d: string = 'RIGHT';
-    let snake = [{x: 10*box, y: 10*box}];
-    let food = {x: 5*box, y: 5*box};
+    const box = 20;
+    let d: string = 'RIGHT';
+    let snake = [{ x: 10 * box, y: 10 * box }];
+    let food = { x: 5 * box, y: 5 * box };
 
-    const game = setInterval(() => {
-      ctx.fillStyle = "black"; ctx.fillRect(0,0,300,300);
-      snake.forEach((s, i) => { ctx.fillStyle = i==0 ? "#1abc9c":"white"; ctx.fillRect(s.x, s.y, box, box); });
-      ctx.fillStyle = "red"; ctx.fillRect(food.x, food.y, box, box);
+    const draw = () => {
+      ctx.fillStyle = "#1e272e"; 
+      ctx.fillRect(0, 0, 300, 300);
 
-      let head = {x: snake[0].x, y: snake[0].y};
-      if(d==='UP') head.y -= box; if(d==='DOWN') head.y += box;
-      if(d==='LEFT') head.x -= box; if(d==='RIGHT') head.x += box;
+      for (let i = 0; i < snake.length; i++) {
+        ctx.fillStyle = i === 0 ? "#1abc9c" : "#ecf0f1";
+        ctx.fillRect(snake[i].x, snake[i].y, box, box);
+      }
 
-      if(head.x === food.x && head.y === food.y) {
-        setScore(s => s+1);
-        food = {x: Math.floor(Math.random()*14)*box, y: Math.floor(Math.random()*14)*box};
-      } else { snake.pop(); }
+      ctx.fillStyle = "#e74c3c"; 
+      ctx.fillRect(food.x, food.y, box, box);
 
-      if(head.x<0 || head.y<0 || head.x>=300 || head.y>=300) clearInterval(game);
-      snake.unshift(head);
-    }, 150);
+      let snakeX = snake[0].x;
+      let snakeY = snake[0].y;
 
-    (window as any).move = (dir: string) => { d = dir; };
+      if (d === 'LEFT') snakeX -= box;
+      if (d === 'UP') snakeY -= box;
+      if (d === 'RIGHT') snakeX += box;
+      if (d === 'DOWN') snakeY += box;
+
+      if (snakeX === food.x && snakeY === food.y) {
+        setScore(s => s + 1);
+        food = { x: Math.floor(Math.random() * 14 + 1) * box, y: Math.floor(Math.random() * 14 + 1) * box };
+      } else {
+        snake.pop();
+      }
+
+      const newHead = { x: snakeX, y: snakeY };
+
+      if (snakeX < 0 || snakeX >= 300 || snakeY < 0 || snakeY >= 300 || snake.some((s, idx) => idx !== 0 && s.x === newHead.x && s.y === newHead.y)) {
+        setGameOver(true);
+        clearInterval(game);
+      }
+      snake.unshift(newHead);
+    };
+
+    let game = setInterval(draw, 150);
+    (window as any).move = (dir: string) => {
+        if (dir === 'UP' && d !== 'DOWN') d = 'UP';
+        if (dir === 'DOWN' && d !== 'UP') d = 'DOWN';
+        if (dir === 'LEFT' && d !== 'RIGHT') d = 'LEFT';
+        if (dir === 'RIGHT' && d !== 'LEFT') d = 'RIGHT';
+    };
+
     return () => clearInterval(game);
-  }, []);
+  }, [gameOver]);
 
   return (
-    <div style={{color:'white', textAlign:'center', paddingTop:'20px'}}>
-      <h2>Rahee Games | Score: {score}</h2>
-      <canvas ref={canvasRef} width="300" height="300" style={{border:'2px solid white'}} />
-      <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', width:'150px', margin:'20px auto', gap:'10px'}}>
-        <button style={{gridColumn:'2'}} onClick={()=> (window as any).move('UP')}>▲</button>
-        <button onClick={()=> (window as any).move('LEFT')}>◀</button>
-        <button onClick={()=> (window as any).move('DOWN')}>▼</button>
-        <button onClick={()=> (window as any).move('RIGHT')}>▶</button>
+    <div style={{ color: 'white', textAlign: 'center', fontFamily: 'sans-serif', backgroundColor: '#2c3e50', minHeight: '100vh', padding: '20px' }}>
+      <h2 style={{ margin: '10px 0' }}>Rahee Snake | Score: {score}</h2>
+      
+      <canvas ref={canvasRef} width="300" height="300" style={{ border: '4px solid #ecf0f1', borderRadius: '8px', backgroundColor: '#1e272e' }} />
+
+      {gameOver && (
+        <div style={{ marginTop: '10px' }}>
+          <h3 style={{ color: '#e74c3c' }}>GAME OVER!</h3>
+          <button style={{ padding: '10px 20px', cursor: 'pointer' }} onClick={() => setGameOver(false)}>Restart Game</button>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', width: '180px', margin: '20px auto', gap: '10px' }}>
+        <button style={{ gridColumn: '2', padding: '15px', borderRadius: '8px' }} onClick={() => (window as any).move('UP')}>▲</button>
+        <button style={{ gridColumn: '1', padding: '15px', borderRadius: '8px' }} onClick={() => (window as any).move('LEFT')}>◀</button>
+        <button style={{ gridColumn: '2', padding: '15px', borderRadius: '8px' }} onClick={() => (window as any).move('DOWN')}>▼</button>
+        <button style={{ gridColumn: '3', padding: '15px', borderRadius: '8px' }} onClick={() => (window as any).move('RIGHT')}>▶</button>
       </div>
+      
+      <p style={{ fontSize: '10px', color: '#bdc3c7' }}>Auto-update setup for @Raheeplays</p>
     </div>
   );
 };
 
 createRoot(document.getElementById('root')!).render(<App />);
-
